@@ -13,6 +13,8 @@
   const GARBLED_CHARACTERS = "锟斤拷烫屯汞咣铪钴铯蜿縺譁亂碼▓▒░◆◇◎※�";
   const encryptedArchive = window.BEIAI_ENCRYPTED_DIARY;
   const encryptedEntries = encryptedArchive?.entries || {};
+  const symbolKeyArchive = window.BEIAI_DIARY_SYMBOL_KEYS;
+  const symbolKeyEntries = symbolKeyArchive?.entries || {};
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
   const entries = Array.from(document.querySelectorAll(".diary-post"));
@@ -149,6 +151,10 @@
     return value.normalize("NFKC").trim().replace(/\s+/g, " ").toUpperCase();
   }
 
+  function normalizeAnswerIgnoringSymbols(value) {
+    return value.normalize("NFKC").replace(/[\p{P}\p{S}\s]+/gu, "").toUpperCase();
+  }
+
   function base64ToBytes(value) {
     const binary = atob(value);
     return Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -179,6 +185,48 @@
         hash: "SHA-256"
       },
       passwordKey,
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["decrypt"]
+    );
+  }
+
+  async function unwrapSymbolInsensitiveDiaryKey(puzzleId, answer, wrappedEntry) {
+    const normalizedAnswer = normalizeAnswerIgnoringSymbols(answer);
+    if (!normalizedAnswer) throw new Error("EMPTY NORMALIZED ANSWER");
+
+    const passwordKey = await crypto.subtle.importKey(
+      "raw",
+      textEncoder.encode(normalizedAnswer),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+    const wrappingKey = await crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: base64ToBytes(wrappedEntry.salt),
+        iterations: symbolKeyArchive.iterations,
+        hash: "SHA-256"
+      },
+      passwordKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["decrypt"]
+    );
+    const rawDiaryKey = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: base64ToBytes(wrappedEntry.iv),
+        additionalData: textEncoder.encode(`beiai-diary-symbol-key:${puzzleId}:v1`)
+      },
+      wrappingKey,
+      base64ToBytes(wrappedEntry.ciphertext)
+    );
+
+    return crypto.subtle.importKey(
+      "raw",
+      rawDiaryKey,
       { name: "AES-GCM", length: 256 },
       true,
       ["decrypt"]
@@ -428,7 +476,10 @@
       attemptCounter.textContent = "正在解密档案";
 
       try {
-        const key = await deriveDiaryKey(submittedAnswer, encryptedEntry);
+        const wrappedEntry = symbolKeyEntries[puzzleId];
+        const key = wrappedEntry
+          ? await unwrapSymbolInsensitiveDiaryKey(puzzleId, submittedAnswer, wrappedEntry)
+          : await deriveDiaryKey(submittedAnswer, encryptedEntry);
         const decryptedHtml = await decryptDiaryEntry(puzzleId, encryptedEntry, key);
         const exportedKey = await crypto.subtle.exportKey("raw", key);
         unlockKeys[puzzleId] = bytesToBase64(new Uint8Array(exportedKey));
