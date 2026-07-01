@@ -2088,6 +2088,21 @@ body.diary-page::after {
     0 0 9px rgba(255, 0, 60, 0.18);
 }
 
+.diary-page .diary-post,
+.diary-page .diary-preface {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.diary-page input,
+.diary-page textarea,
+.diary-page [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 .diary-post::before {
   content: "";
   position: absolute;

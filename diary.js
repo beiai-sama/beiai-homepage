@@ -24,6 +24,31 @@
 
   if (!entries.length) return;
 
+  function isEditableElement(element) {
+    return Boolean(element?.closest?.('input, textarea, [contenteditable="true"]'));
+  }
+
+  function selectionIsInsideDiary() {
+    const selection = window.getSelection?.();
+    const node = selection?.anchorNode;
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return Boolean(element?.closest?.(".diary-post, .diary-preface"));
+  }
+
+  document.addEventListener("copy", (event) => {
+    if (isEditableElement(event.target) || !selectionIsInsideDiary()) return;
+    event.preventDefault();
+    event.clipboardData?.setData("text/plain", "ARCHIVE COPY DENIED // 日记内容禁止复制");
+  });
+
+  document.addEventListener("cut", (event) => {
+    if (!isEditableElement(event.target) && selectionIsInsideDiary()) event.preventDefault();
+  });
+
+  document.addEventListener("dragstart", (event) => {
+    if (event.target.closest?.(".diary-post, .diary-preface")) event.preventDefault();
+  });
+
   function loadExpandedEntries() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
