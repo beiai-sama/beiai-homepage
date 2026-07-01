@@ -1,6 +1,7 @@
 (() => {
   const petApi = window.BEIAI_PET;
   const FEED_COST = 5;
+  const HINT_COST = 10;
   const helloLines = [
     "HELLO! 你今天也在上网吗？",
     "我住在一个很小但很亮的窗口里。",
@@ -135,6 +136,24 @@
         commit("SLEEP MODE... zZz... 状态已切换为睡眠。");
       } else {
         commit("WAKE UP! 状态已切换为在线。");
+      }
+      return;
+    }
+
+    if (action === "hint") {
+      // HINT 消耗 10 coins 高于 FEED(5) 以控制获取频率，但低于 JACKPOT(30) 确保老虎机中奖后能换三次提示
+      if (state.coins < HINT_COST) {
+        commit("金币不够！一次提示需要 " + HINT_COST + " coins，去试试 SLOT 吧。");
+        return;
+      }
+      wakePet();
+      state.coins -= HINT_COST;
+      const hint = petApi.getRandomDiaryHint();
+      if (!hint) {
+        state.coins += HINT_COST;
+        commit("所有日记已解锁或已摧毁，没有需要提示的档案。");
+      } else {
+        commit("档案 " + hint.puzzleId + " 的线索：" + hint.hint);
       }
       return;
     }

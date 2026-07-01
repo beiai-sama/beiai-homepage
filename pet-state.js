@@ -232,6 +232,55 @@
     return true;
   }
 
+  // 只返回 未解锁且未摧毁 的谜题，已摧毁的给提示也没用了，已解锁的不需要提示
+  const DIARY_PUZZLE_IDS = [
+    "2021-02-30","2021-04-31","2021-06-31","2021-09-31","2021-11-31",
+    "2022-02-29","2022-05-32","2022-13-08",
+    "2023-00-17","2023-02-30","2023-07-32","2023-11-31",
+    "2024-04-31","2024-06-31","2024-09-31",
+    "2025-02-29","2025-05-32","2025-09-31","2025-12-32"
+  ];
+  const DIARY_HINTS = {
+    "2021-02-30": "第1日记提示",
+    "2021-04-31": "第2日记提示",
+    "2021-06-31": "第3日记提示",
+    "2021-09-31": "第4日记提示",
+    "2021-11-31": "第5日记提示",
+    "2022-02-29": "第6日记提示",
+    "2022-05-32": "第7日记提示",
+    "2022-13-08": "第8日记提示",
+    "2023-00-17": "第9日记提示",
+    "2023-02-30": "第10日记提示",
+    "2023-07-32": "第11日记提示",
+    "2023-11-31": "第12日记提示",
+    "2024-04-31": "第13日记提示",
+    "2024-06-31": "第14日记提示",
+    "2024-09-31": "第15日记提示",
+    "2025-02-29": "第16日记提示",
+    "2025-05-32": "第17日记提示",
+    "2025-09-31": "第18日记提示",
+    "2025-12-32": "第19日记提示"
+  };
+
+  function getUnsolvedPuzzleIds() {
+    const solved = new Set(
+      (() => { try { const v = JSON.parse(localStorage.getItem(DIARY_SOLVED_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; } })()
+    );
+    const attempts = (() => { try { const v = JSON.parse(localStorage.getItem(DIARY_ATTEMPTS_KEY)); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } })();
+    return DIARY_PUZZLE_IDS.filter((id) => {
+      if (solved.has(id)) return false;   // 已解锁
+      if (attempts[id] === 0) return false;   // 已摧毁
+      return true;
+    });
+  }
+
+  function getRandomDiaryHint() {
+    const unsolved = getUnsolvedPuzzleIds();
+    if (!unsolved.length) return null;
+    const id = unsolved[Math.floor(Math.random() * unsolved.length)];
+    return { puzzleId: id, hint: DIARY_HINTS[id] || "这条谜题的答案藏在音乐库里。" };   // fallback 机制，防止出错时给用户返回 undefined
+  }
+
   window.BEIAI_PET = Object.freeze({
     keys: Object.freeze({
       petState: PET_STATE_KEY,
@@ -254,6 +303,8 @@
     isEndingUnlocked,
     restoreTalk,
     isTalkRestored,
-    resetDebugProgress
+    resetDebugProgress,
+    getUnsolvedPuzzleIds,
+    getRandomDiaryHint
   });
 })();
