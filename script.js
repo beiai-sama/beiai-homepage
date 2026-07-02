@@ -352,6 +352,7 @@ const precomputedMusicColors = new Map(
     .map((track) => [new URL(track.cover, document.baseURI).href, track.themeColor])
 );
 let musicThemeRequestId = 0;
+let musicThemeClearTimer = 0;
 
 function clampColorChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -510,8 +511,17 @@ function colorToCss(color) {
   return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
+const DEFAULT_MUSIC_PALETTE = Object.freeze({
+  primary: [22, 143, 216],
+  accent: [115, 230, 255],
+  secondary: [255, 120, 200],
+  deep: [8, 44, 102],
+  pale: [223, 250, 255]
+});
+
 function applyMusicPalette(palette) {
   const root = document.documentElement;
+  window.clearTimeout(musicThemeClearTimer);
   root.style.setProperty("--music-theme-primary", colorToCss(palette.primary));
   root.style.setProperty("--music-theme-accent", colorToCss(palette.accent));
   root.style.setProperty("--music-theme-secondary", colorToCss(palette.secondary));
@@ -707,6 +717,9 @@ syncMusicMotionButtons();
 
 async function updateMusicTheme(coverUrl) {
   const requestId = ++musicThemeRequestId;
+  const root = document.documentElement;
+  const animateThemeEntry = !shouldReduceAmbientMotion() && !root.classList.contains("music-theme-active");
+  if (animateThemeEntry) applyMusicPalette(DEFAULT_MUSIC_PALETTE);
   const absoluteCoverUrl = new URL(coverUrl, document.baseURI).href;
   let palette = musicThemePaletteCache.get(absoluteCoverUrl);
 
@@ -725,12 +738,34 @@ async function updateMusicTheme(coverUrl) {
     musicThemePaletteCache.set(absoluteCoverUrl, palette);
   }
 
-  if (requestId === musicThemeRequestId) applyMusicPalette(palette);
+  if (requestId !== musicThemeRequestId) return;
+  if (!animateThemeEntry) {
+    applyMusicPalette(palette);
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (requestId === musicThemeRequestId) applyMusicPalette(palette);
+    });
+  });
 }
 
 function clearMusicTheme() {
-  musicThemeRequestId += 1;
-  document.documentElement.classList.remove("music-theme-active");
+  const requestId = ++musicThemeRequestId;
+  const root = document.documentElement;
+  window.clearTimeout(musicThemeClearTimer);
+
+  if (shouldReduceAmbientMotion() || !root.classList.contains("music-theme-active")) {
+    root.classList.remove("music-theme-active");
+    resetMusicBeatPulse();
+    return;
+  }
+
+  applyMusicPalette(DEFAULT_MUSIC_PALETTE);
+  musicThemeClearTimer = window.setTimeout(() => {
+    if (requestId === musicThemeRequestId) root.classList.remove("music-theme-active");
+  }, 800);
   resetMusicBeatPulse();
 }
 
